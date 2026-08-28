@@ -1,38 +1,161 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>VelaGate</title>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>VelaGate</title>
 <style>
-*{box-sizing:border-box}html,body{margin:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;background:#efefed;color:#20262b}.app{height:100%;display:flex;flex-direction:column}.top{height:58px;background:#11191f;color:#fff;display:flex;align-items:center;padding:0 12px;box-shadow:0 2px 7px #0004}.logo{width:28px;height:28px;margin-right:10px}.title{font-size:20px;font-weight:600;flex:1}.ib{width:42px;height:42px;border:0;background:transparent;color:#fff;font-size:28px;border-radius:50%}.main{flex:1;overflow:auto}.empty{height:100%;display:flex;align-items:center;justify-content:center;padding:24px}.drop{width:min(360px,92vw);padding:46px 22px;border:1.5px dashed #a8afb2;border-radius:16px;background:#ffffffb8;text-align:center;color:#737b80}.drop h2{margin:0 0 8px;color:#30373c;font-size:18px}.drop p{margin:0;font-size:14px}.list{display:none;background:#fff}.list.show{display:block}.row{height:77px;display:flex;border-bottom:1px solid #d8dcda;background:#fbfbfa;cursor:pointer}.bar{width:5px;background:#9da2a5}.row.selected .bar{background:#17b26a}.info{flex:1;min-width:0;padding:11px}.name{font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sub{font-size:13px;color:#858d91;margin-top:4px}.proto{font-size:11px;color:#dd5a64;margin-top:3px;font-variant-numeric:tabular-nums}.row.selected .proto{color:#17a365;font-weight:700}.acts{display:flex;align-items:center}.ab{width:42px;height:54px;border:0;background:transparent;font-size:20px}.bottom{height:62px;background:#11191f;color:#c9d0d4;display:flex;align-items:center;padding:0 17px;position:relative}.dot{width:8px;height:8px;border-radius:50%;background:#6f777d;margin-right:9px}.bottom.on .dot{background:#17b26a;box-shadow:0 0 0 4px #17b26a22}.statusWrap{display:flex;flex-direction:column;gap:2px}.status{font-size:13px}.traffic{font-size:10px;color:#829097;font-variant-numeric:tabular-nums}.bottom.on .traffic{color:#9ccdb6}.fab{position:absolute;right:16px;bottom:31px;width:58px;height:58px;border-radius:50%;border:0;background:#6c7377;color:white;font-size:25px;box-shadow:0 6px 14px #0005}.fab.ready{background:#17b26a}.toast{position:fixed;left:50%;bottom:82px;transform:translateX(-50%);background:#263037ef;color:#fff;padding:10px 15px;border-radius:20px;font-size:13px;opacity:0;transition:.2s;z-index:50;white-space:nowrap}.toast.show{opacity:1}.modal{position:fixed;inset:0;background:#0008;display:none;align-items:center;justify-content:center;padding:22px;z-index:40}.modal.show{display:flex}.card{width:min(380px,96vw);background:#fff;border-radius:18px;padding:20px}.card h3{margin:0 0 16px}.field{margin:10px 0}.field label{display:block;font-size:12px;color:#737b80;margin-bottom:5px}.field input{width:100%;height:42px;border:1px solid #cfd4d5;border-radius:10px;padding:0 11px}.buttons{text-align:right;margin-top:16px}.btn{border:0;background:transparent;padding:10px 13px}.primary{color:#0d8c55;font-weight:650}.qr{text-align:center}.qr img{width:230px;height:230px;image-rendering:pixelated}.small{font-size:12px;color:#858d91;margin-top:8px}
-</style></head><body>
-<div class="app"><header class="top"><svg class="logo" viewBox="0 0 28 28"><path fill="#17b26a" d="M14 2.5 24 6.2l-1.4 12.1L14 25.6 5.4 18.3 4 6.2z"/><path fill="#0e1d24" d="M14 5.8 21 8.4l-1 8.4-6 5.2-6-5.2-1-8.4z"/><path fill="#ecfff6" d="M8.5 10.2h3.1l2.4 4.3 4-7h3.2l-7.3 13.1z"/></svg><div class="title">VelaGate</div><button class="ib" id="add">＋</button><button class="ib" id="menu">⋮</button></header>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;background:#efefed;color:#20262b}.app{height:100%;display:flex;flex-direction:column}.top{height:58px;background:#11191f;color:#fff;display:flex;align-items:center;padding:0 12px;box-shadow:0 2px 7px #0004;z-index:3}.logo{width:28px;height:28px;margin-right:10px}.title{font-size:20px;font-weight:600;flex:1}.ib{width:42px;height:42px;border:0;background:transparent;color:#fff;font-size:28px;border-radius:50%}.ib:active,.ab:active{background:#ffffff12}.main{flex:1;overflow:auto}.empty{height:100%;display:flex;align-items:center;justify-content:center;padding:24px}.drop{width:min(360px,92vw);padding:46px 22px;border:1.5px dashed #a8afb2;border-radius:16px;background:#ffffffb8;text-align:center;color:#737b80}.drop h2{margin:0 0 8px;color:#30373c;font-size:18px}.drop p{margin:0;font-size:14px;line-height:1.6}.list{display:none;background:#fff}.list.show{display:block}.row{height:77px;display:flex;border-bottom:1px solid #d8dcda;background:#fbfbfa;cursor:pointer}.bar{width:5px;background:#9da2a5}.row.selected .bar{background:#17b26a}.row.package .bar{background:#79838a}.info{flex:1;min-width:0;padding:11px}.name{font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sub{font-size:13px;color:#858d91;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.proto{font-size:11px;color:#dd5a64;margin-top:3px;font-variant-numeric:tabular-nums}.row.selected .proto{color:#17a365;font-weight:700}.row.package .proto{color:#607078}.acts{display:flex;align-items:center}.ab{width:42px;height:54px;border:0;background:transparent;font-size:19px}.bottom{height:62px;background:#11191f;color:#c9d0d4;display:flex;align-items:center;padding:0 17px;position:relative}.dot{width:8px;height:8px;border-radius:50%;background:#6f777d;margin-right:9px}.bottom.on .dot{background:#17b26a;box-shadow:0 0 0 4px #17b26a22}.statusWrap{display:flex;flex-direction:column;gap:2px}.status{font-size:13px}.traffic{font-size:10px;color:#829097;font-variant-numeric:tabular-nums;visibility:hidden}.bottom.on .traffic{visibility:visible;color:#9ccdb6}.fab{position:absolute;right:16px;bottom:31px;width:58px;height:58px;border-radius:50%;border:0;background:#596166;color:white;font-size:25px;box-shadow:0 6px 14px #0005}.fab.ready{background:#17b26a}.fab:active{transform:scale(.96)}.toast{position:fixed;left:50%;bottom:82px;transform:translateX(-50%);background:#263037ef;color:#fff;padding:10px 15px;border-radius:20px;font-size:13px;opacity:0;transition:.2s;z-index:50;white-space:nowrap;max-width:88vw;overflow:hidden;text-overflow:ellipsis}.toast.show{opacity:1}.modal{position:fixed;inset:0;background:#0008;display:none;align-items:center;justify-content:center;padding:22px;z-index:40}.modal.show{display:flex}.card{width:min(380px,96vw);background:#fff;border-radius:18px;padding:20px}.card h3{margin:0 0 16px}.field{margin:10px 0}.field label{display:block;font-size:12px;color:#737b80;margin-bottom:5px}.field input{width:100%;height:42px;border:1px solid #cfd4d5;border-radius:10px;padding:0 11px}.buttons{text-align:right;margin-top:16px}.btn{border:0;background:transparent;padding:10px 13px}.primary{color:#0d8c55;font-weight:650}.qr{text-align:center}.qr img{width:230px;height:230px;image-rendering:pixelated}.small{font-size:12px;color:#858d91;margin-top:8px}
+</style>
+</head>
+<body>
+<div class="app">
+<header class="top">
+<svg class="logo" viewBox="0 0 28 28"><path fill="#17b26a" d="M14 2.5 24 6.2l-1.4 12.1L14 25.6 5.4 18.3 4 6.2z"/><path fill="#0e1d24" d="M14 5.8 21 8.4l-1 8.4-6 5.2-6-5.2-1-8.4z"/><path fill="#ecfff6" d="M8.5 10.2h3.1l2.4 4.3 4-7h3.2l-7.3 13.1z"/></svg>
+<div class="title">VelaGate</div><button class="ib" id="add">＋</button><button class="ib" id="menu">⋮</button>
+</header>
 <main class="main"><div id="list" class="list"></div><div id="empty" class="empty"><div class="drop" id="drop"><h2>Please add configuration file</h2><p>Drag a .conf file here or tap +</p></div></div></main>
-<footer id="bottom" class="bottom"><span class="dot"></span><div class="statusWrap"><span id="status" class="status">Please connect</span><span id="traffic" class="traffic">↓ 0 B  ↑ 0 B</span></div><button id="connect" class="fab">⌁</button></footer></div>
+<footer id="bottom" class="bottom"><span class="dot"></span><div class="statusWrap"><span id="status" class="status">Please connect</span><span id="traffic" class="traffic">↓ 0 B  ↑ 0 B</span></div><button id="connect" class="fab">⌁</button></footer>
+</div>
 <div id="toast" class="toast"></div>
 <div id="edit" class="modal"><div class="card"><h3>Edit node</h3><div class="field"><label>Name</label><input id="ename"></div><div class="field"><label>IP address</label><input id="eip"></div><div class="field"><label>Port</label><input id="eport"></div><div class="buttons"><button class="btn" onclick="closeM('edit')">Cancel</button><button class="btn primary" id="save">Save</button></div></div></div>
-<div id="qr" class="modal"><div class="card qr"><h3>Share route</h3><img alt="QR code" src="data:image/png;base64,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"><div>This route has been parsed and cannot be parsed again.</div><div id="qrnode" class="small"></div><div class="buttons"><button class="btn primary" onclick="closeM('qr')">Done</button></div></div></div>
+<div id="qr" class="modal"><div class="card qr"><h3>Share route</h3><img id="qrimg" alt="QR code"><div>This route has been parsed and cannot be parsed again.</div><div id="qrnode" class="small"></div><div class="buttons"><button class="btn primary" onclick="closeM('qr')">Done</button></div></div></div>
 <script>
-const $=x=>document.getElementById(x);let state=load(),editing=null,connected=false,latencyTimer=null,selected=-1;
-function load(){try{return JSON.parse(localStorage.getItem('vg.state')||'null')}catch(e){return null}}
-function save(){state?localStorage.setItem('vg.state',JSON.stringify(state)):localStorage.removeItem('vg.state')}
-function toast(m){let t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),1800);try{Android.toast(m)}catch(e){}}
-function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+const $=id=>document.getElementById(id);
+const endpointPool=[
+  ['154.40.50.182',23887],
+  ['45.88.194.72',31844],
+  ['91.205.187.46',15622],
+  ['185.225.73.119',24443],
+  ['96.126.190.134',39393],
+  ['193.29.107.61',27108],
+  ['89.58.12.206',18443],
+  ['194.87.46.133',32018]
+];
+let state=loadState();
+let selected=Number.isInteger(state?.selected)?state.selected:-1;
+let connected=false;
+let editing=-1;
+let latencyTimer=null;
+let totalRx=0,totalTx=0;
+
+function emptyState(){return {routeId:null,routeName:null,nodes:[],traffic:null,selected:-1}}
+function loadState(){try{let v=JSON.parse(localStorage.getItem('vg.state')||'null');return v||emptyState()}catch(e){return emptyState()}}
+function saveState(){state.selected=selected;localStorage.setItem('vg.state',JSON.stringify(state))}
+function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function toast(m){let t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),1900);try{Android.toast(m)}catch(e){}}
 function closeM(id){$(id).classList.remove('show')}
-function nodes(){return state?.nodes||[]}
-function row(n,i){let sel=i===selected;return `<div class="row ${sel?'selected':''}" onclick="selectNode(${i})"><div class="bar"></div><div class="info"><div class="name">${esc(n.name)}</div><div class="sub">${esc(n.ip)} : ${esc(n.port)}</div><div class="proto" id="lat-${i}">${sel?(n.latency||'-- ms'):'VLESS'}</div></div><div class="acts"><button class="ab" onclick="event.stopPropagation();share(${i})">↗</button><button class="ab" onclick="event.stopPropagation();editNode(${i})">✎</button><button class="ab" onclick="event.stopPropagation();del(${i})">⌫</button></div></div>`}
-function render(){let a=nodes().map((n,i)=>row(n,i));$('list').innerHTML=a.join('');$('list').classList.toggle('show',a.length>0);$('empty').style.display=a.length?'none':'flex';$('connect').classList.toggle('ready',selected>=0&&a.length>0);if(!a.length){selected=-1;disconnect(false)}renderStatus()}
-function renderStatus(){let n=nodes()[selected];$('bottom').classList.toggle('on',connected&&!!n);$('status').textContent=connected&&n?`Connected · ${n.name}`:'Please connect';if(!connected)$('traffic').textContent='↓ 0 B  ↑ 0 B'}
-function selectNode(i){if(i<0||i>=nodes().length)return;if(connected)disconnect(false);selected=i;render();startLatency();toast(`Selected ${nodes()[i].name}`)}
-function startLatency(){clearInterval(latencyTimer);if(selected<0)return;function tick(){let n=nodes()[selected];if(!n)return;n.latency=(50+Math.floor(Math.random()*151))+' ms';let el=$('lat-'+selected);if(el)el.textContent=n.latency}tick();latencyTimer=setInterval(tick,1200)}
-function connectToggle(){if(selected<0){toast('Please select a node first');return}connected=!connected;if(connected){try{Android.startTrafficProbe()}catch(e){}toast('Connected')}else{try{Android.stopTrafficProbe()}catch(e){}toast('Disconnected')}renderStatus()}
-function disconnect(showToast=true){connected=false;try{Android.stopTrafficProbe()}catch(e){}if(showToast)toast('Disconnected');renderStatus()}
-window.onTrafficSample=function(rx,tx,ok,elapsed){if(!connected)return;$('traffic').textContent=`↓ ${fmt(rx)}  ↑ ${fmt(tx)} · ${ok?'online':'retrying'}`}
-function fmt(v){v=Number(v)||0;if(v<1024)return v+' B';if(v<1048576)return (v/1024).toFixed(1)+' KB';return (v/1048576).toFixed(1)+' MB'}
-window.onNativeConf=function(raw,file){try{let c=JSON.parse(raw);if(c.kind==='route'){let p=c.payload||{};state={fileId:c.fileId,title:p.title||'Europe Route',nodes:(p.nodes||[]).map(x=>({id:x.id,name:x.name,ip:x.ip,port:x.port,protocol:x.protocol||'VLESS'}))};selected=-1;connected=false;save();render();toast('Configuration loaded')}else{toast('Traffic package loaded')}}catch(e){toast('Invalid configuration')}}
-window.onNativeError=m=>toast(m);
-function del(i){if(i<0||i>=nodes().length)return;nodes().splice(i,1);if(selected===i){selected=-1;disconnect(false)}else if(selected>i)selected--;if(nodes().length===0)state=null;save();render()}
-function editNode(i){let n=nodes()[i];if(!n)return;editing=i;$('ename').value=n.name;$('eip').value=n.ip;$('eport').value=n.port;$('edit').classList.add('show')}
-$('save').onclick=()=>{let n=nodes()[editing];if(!n)return;n.name=$('ename').value.trim()||n.name;n.ip=$('eip').value.trim()||n.ip;n.port=$('eport').value.trim()||n.port;save();closeM('edit');render();startLatency()}
-function share(i){let n=nodes()[i];if(!n)return;$('qrnode').textContent=n.name;$('qr').classList.add('show')}
-$('add').onclick=()=>{try{Android.pickConfigs()}catch(e){toast('File picker unavailable')}};$('connect').onclick=connectToggle;$('menu').onclick=()=>toast('VelaGate');
-['dragenter','dragover'].forEach(e=>$('drop').addEventListener(e,x=>{x.preventDefault()}));$('drop').addEventListener('drop',x=>x.preventDefault());
-render();
-</script></body></html>
+function hasRoute(){return !!state.routeId&&Array.isArray(state.nodes)&&state.nodes.length>0}
+function hasTraffic(){return !!state.traffic&&state.traffic.routeFileId===state.routeId}
+function fullyUnlocked(){return hasRoute()&&hasTraffic()}
+function canConnect(){return fullyUnlocked()&&selected>=0&&selected<state.nodes.length}
+function decorateNodes(nodes){return (nodes||[]).map((n,i)=>{let ep=endpointPool[i%endpointPool.length];return {...n,ip:ep[0],port:ep[1],protocol:n.protocol||'VLESS',latency:n.latency||randomLatency()}})}
+function randomLatency(){return 50+Math.floor(Math.random()*151)}
+function formatBytes(n){n=Math.max(0,Number(n)||0);if(n<1024)return n+' B';if(n<1024*1024)return (n/1024).toFixed(1)+' KB';return (n/1024/1024).toFixed(1)+' MB'}
+
+function row(n,i){
+  let sel=i===selected;
+  let proto=sel?(n.latency+' ms'):(n.protocol||'VLESS');
+  return `<div class="row ${sel?'selected':''}" onclick="selectNode(${i})"><div class="bar"></div><div class="info"><div class="name">${esc(n.name)}</div><div class="sub">${esc(n.ip)} : ${esc(n.port)}</div><div class="proto" id="lat-${i}">${esc(proto)}</div></div><div class="acts"><button class="ab" onclick="event.stopPropagation();shareNode(${i})">⌁</button><button class="ab" onclick="event.stopPropagation();editNode(${i})">✎</button><button class="ab" onclick="event.stopPropagation();deleteNode(${i})">⌫</button></div></div>`;
+}
+function packageRow(){
+  if(!state.traffic)return '';
+  let name=state.traffic.name||state.traffic.title||'Traffic Package 1000G';
+  let quota=state.traffic.quotaGB?state.traffic.quotaGB+' GB':'1000 GB';
+  return `<div class="row package"><div class="bar"></div><div class="info"><div class="name">${esc(name)}</div><div class="sub">${esc(quota)} · Europe Route</div><div class="proto">PACKAGE READY</div></div><div class="acts"><button class="ab" onclick="deleteTraffic()">⌫</button></div></div>`;
+}
+function render(){
+  if(selected>=state.nodes.length)selected=-1;
+  let html=packageRow()+state.nodes.map(row).join('');
+  $('list').innerHTML=html;
+  $('list').classList.toggle('show',!!html);
+  $('empty').style.display=html?'none':'flex';
+  $('connect').classList.toggle('ready',canConnect()&&!connected);
+  if(!hasRoute()&&connected)disconnect();
+  updateBottom();
+}
+function updateBottom(){
+  $('bottom').classList.toggle('on',connected);
+  if(connected){$('status').textContent='Connected · '+(state.nodes[selected]?.name||'Route');return}
+  $('status').textContent='Please connect';
+  $('traffic').textContent='↓ 0 B  ↑ 0 B';
+}
+function selectNode(i){
+  if(i<0||i>=state.nodes.length)return;
+  if(connected)disconnect();
+  selected=i;
+  state.nodes[i].latency=randomLatency();
+  saveState();render();startLatency();
+}
+function startLatency(){
+  clearInterval(latencyTimer);
+  if(selected<0)return;
+  latencyTimer=setInterval(()=>{
+    if(selected<0||!state.nodes[selected])return;
+    state.nodes[selected].latency=randomLatency();
+    let el=$('lat-'+selected);if(el)el.textContent=state.nodes[selected].latency+' ms';
+  },1100);
+}
+function connectToggle(){
+  if(connected){disconnect();return}
+  if(!hasRoute()){toast('Please add Europe route configuration');return}
+  if(!hasTraffic()){toast('Traffic package configuration is required');return}
+  if(selected<0){toast('Please select a node');return}
+  connected=true;totalRx=0;totalTx=0;updateBottom();render();
+  try{Android.startTrafficProbe()}catch(e){}
+}
+function disconnect(){
+  connected=false;totalRx=0;totalTx=0;
+  try{Android.stopTrafficProbe()}catch(e){}
+  updateBottom();render();
+}
+window.onTrafficSample=function(rx,tx,ok,elapsed){
+  if(!connected)return;
+  totalRx+=Number(rx)||0;totalTx+=Number(tx)||0;
+  $('traffic').textContent=`↓ ${formatBytes(totalRx)}  ↑ ${formatBytes(totalTx)} · ${ok?'online':'checking'}`;
+};
+function shareNode(i){
+  let n=state.nodes[i];if(!n)return;
+  $('qrnode').textContent=n.name+' · '+n.ip+':'+n.port;
+  let text='该线路已被解析，不能再次解析。';
+  $('qrimg').src='https://api.qrserver.com/v1/create-qr-code/?size=230x230&margin=8&data='+encodeURIComponent(text);
+  $('qr').classList.add('show');
+}
+function editNode(i){let n=state.nodes[i];if(!n)return;editing=i;$('ename').value=n.name;$('eip').value=n.ip;$('eport').value=n.port;$('edit').classList.add('show')}
+$('save').onclick=()=>{if(editing<0||!state.nodes[editing])return;let n=state.nodes[editing];n.name=$('ename').value.trim()||n.name;n.ip=$('eip').value.trim()||n.ip;n.port=parseInt($('eport').value,10)||n.port;saveState();closeM('edit');render()};
+function deleteNode(i){
+  if(i<0||i>=state.nodes.length)return;
+  if(connected&&i===selected)disconnect();
+  state.nodes.splice(i,1);
+  if(selected===i)selected=-1;else if(selected>i)selected--;
+  if(state.nodes.length===0){state.routeId=null;state.routeName=null;selected=-1}
+  saveState();render();startLatency();
+}
+function deleteTraffic(){if(connected)disconnect();state.traffic=null;saveState();render();toast('Traffic package removed')}
+function resetAll(){if(connected)disconnect();state=emptyState();selected=-1;saveState();render();startLatency()}
+
+window.onNativeConf=function(json,fileName){
+  try{
+    let c=JSON.parse(json),p=c.payload||{};
+    if(c.kind==='route'){
+      if(state.traffic&&state.traffic.routeFileId&&state.traffic.routeFileId!==c.fileId){state.traffic=null}
+      state.routeId=c.fileId;state.routeName=fileName;state.nodes=decorateNodes(p.nodes||[]);selected=-1;
+      saveState();render();toast('Europe route loaded');
+    }else if(c.kind==='traffic'){
+      let routeFileId=p.routeFileId;
+      if(state.routeId&&routeFileId!==state.routeId){toast('Traffic package does not match this route');return}
+      state.traffic={...p,fileId:c.fileId,routeFileId:routeFileId,name:p.name||p.title||'Traffic Package 1000G'};
+      saveState();render();toast('Traffic package loaded');
+    }
+  }catch(e){toast('Configuration parsing failed')}
+};
+window.onNativeError=function(m){toast(m||'Configuration parsing failed')};
+$('add').onclick=()=>{try{Android.pickConfigs()}catch(e){toast('File picker unavailable')}};
+$('connect').onclick=connectToggle;
+$('menu').onclick=()=>{if(confirm('Remove all configurations?'))resetAll()};
+['dragenter','dragover'].forEach(ev=>$('drop').addEventListener(ev,e=>{e.preventDefault()}));
+$('drop').addEventListener('drop',e=>{e.preventDefault();toast('Drop received')});
+render();startLatency();
+</script>
+</body>
+</html>
