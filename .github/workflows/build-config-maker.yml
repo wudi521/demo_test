@@ -1,0 +1,43 @@
+name: Build VelaGate Config Maker
+on:
+  workflow_dispatch:
+  push:
+    branches: [ velagate ]
+    paths:
+      - 'config-maker/**'
+      - '.github/workflows/build-config-maker.yml'
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: pip install -r config-maker/requirements.txt
+      - name: Build Windows EXE
+        run: pyinstaller --noconfirm --clean --onefile --windowed --name VelaGate-Config-Maker config-maker/config_maker.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: VelaGate-Config-Maker-Windows
+          path: dist/VelaGate-Config-Maker.exe
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: pip install -r config-maker/requirements.txt
+      - name: Build macOS app
+        run: pyinstaller --noconfirm --clean --windowed --name VelaGate-Config-Maker config-maker/config_maker.py
+      - name: Zip macOS app
+        run: ditto -c -k --sequesterRsrc --keepParent dist/VelaGate-Config-Maker.app VelaGate-Config-Maker-macOS.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: VelaGate-Config-Maker-macOS
+          path: VelaGate-Config-Maker-macOS.zip
