@@ -205,9 +205,13 @@ public class MainActivity extends Activity {
                 throw new SecurityException("Traffic configuration is not bound to a route file");
             }
 
-            JSONObject claim = claimFile(fileId, kind);
+            JSONObject claim = claimFile(raw);
             if (!claim.optBoolean("ok")) {
-                throw new SecurityException(claim.optString("message", "Configuration has already been used"));
+                String code = claim.optString("code", "CLAIM_FAILED");
+                if ("FILE_ALREADY_CLAIMED".equals(code)) {
+                    throw new SecurityException("This configuration has already been used on another device");
+                }
+                throw new SecurityException("Configuration activation failed: " + code);
             }
 
             prefs.edit().putBoolean("imported:" + fileId, true).apply();
@@ -217,7 +221,7 @@ public class MainActivity extends Activity {
             normalized.put("fileId", fileId);
             normalized.put("issuedAt", issuedAt);
             normalized.put("payload", payload);
-            normalized.put("claimMode", claim.optString("mode", "local"));
+            normalized.put("claimMode", "supabase");
             normalized.put("claimCode", claim.optString("code", "CLAIMED"));
 
             runOnUiThread(() -> {
@@ -239,25 +243,26 @@ public class MainActivity extends Activity {
         return verifier.verify(Base64.decode(signatureB64, Base64.DEFAULT));
     }
 
-    private JSONObject claimFile(String fileId, String kind) throws Exception {
-        String base = activationBaseUrl();
-        if (base.isEmpty()) return claimLocal(fileId, kind);
-
-        HttpURLConnection conn = (HttpURLConnection) new URL(base + "/claim").openConnection();
-        conn.setConnectTimeout(7000);
-        conn.setReadTimeout(7000);
+    private JSONObject claimFile(JSONObject config) throws Exception {
+        String endpoint = BuildConfig.SUPABASE_URL + "/functions/v1/velagate-claim";
+        HttpURLConnection conn = (HttpURLConnection) new URL(endpoint).openConnection();
+        conn.setConnectTimeout(8000);
+        conn.setReadTimeout(8000);
         conn.setRequestMethod("POST");
         conn.setDoOutput(true);
+        conn.setUseCaches(false);
         conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
         conn.setRequestProperty("Cache-Control", "no-store");
+        conn.setRequestProperty("apikey", BuildConfig.SUPABASE_PUBLISHABLE_KEY);
 
         JSONObject body = new JSONObject();
-        body.put("fileId", fileId);
-        body.put("kind", kind);
         body.put("deviceId", deviceId());
-        byte[] raw = body.toString().getBytes(StandardCharsets.UTF_8);
-        conn.setFixedLengthStreamingMode(raw.length);
-        try (OutputStream os = conn.getOutputStream()) { os.write(raw); }
+        body.put("config", config);
+        byte[] requestBytes = body.toString().getBytes(StandardCharsets.UTF_8);
+        conn.setFixedLengthStreamingMode(requestBytes.length);
+        try (OutputStream os = conn.getOutputStream()) {
+            os.write(requestBytes);
+        }
 
         int status = conn.getResponseCode();
         InputStream stream = status >= 200 && status < 300 ? conn.getInputStream() : conn.getErrorStream();
@@ -267,28 +272,9 @@ public class MainActivity extends Activity {
         JSONObject result;
         try { result = new JSONObject(text); }
         catch (Exception ignored) { result = new JSONObject(); }
-        result.put("mode", "remote");
         if (!result.has("ok")) result.put("ok", status >= 200 && status < 300);
-        if (!result.has("message")) result.put("message", result.optBoolean("ok") ? "Configuration claimed" : "Configuration claim failed");
+        if (!result.has("code")) result.put("code", status >= 200 && status < 300 ? "CLAIMED" : "CLAIM_FAILED");
         return result;
-    }
-
-    private JSONObject claimLocal(String fileId, String kind) throws Exception {
-        JSONObject out = new JSONObject();
-        out.put("ok", true);
-        out.put("mode", "local");
-        out.put("code", "LOCAL_ONLY");
-        out.put("fileId", fileId);
-        out.put("kind", kind);
-        return out;
-    }
-
-    private String activationBaseUrl() {
-        String base = BuildConfig.ACTIVATION_URL == null ? "" : BuildConfig.ACTIVATION_URL.trim();
-        while (base.endsWith("/")) base = base.substring(0, base.length() - 1);
-        if (base.endsWith("/activate")) base = base.substring(0, base.length() - 9);
-        if (base.endsWith("/claim")) base = base.substring(0, base.length() - 6);
-        return base;
     }
 
     private String deviceId() {
@@ -433,6 +419,6 @@ public class MainActivity extends Activity {
         public void stopTrafficProbe() { MainActivity.this.stopTrafficProbe(); }
 
         @JavascriptInterface
-        public String getActivationMode() { return activationBaseUrl().isEmpty() ? "local" : "remote"; }
+        public String getActivationMode() { return "supabase"; }
     }
 }
