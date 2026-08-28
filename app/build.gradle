@@ -1,0 +1,34 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.velagate.app'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.velagate.app'
+        minSdk 23
+        targetSdk 35
+        versionCode 1
+        versionName '1.0.0'
+
+        def activationUrl = project.findProperty('VELAGATE_ACTIVATION_URL') ?: ''
+        buildConfigField 'String', 'ACTIVATION_URL', '"' + activationUrl.replace('\\', '\\\\').replace('"', '\\"') + '"'
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
