@@ -5,13 +5,13 @@ import android.content.ClipData;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.graphics.Color;
+import android.net.TrafficStats;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.provider.OpenableColumns;
-import android.provider.Settings;
 import android.util.Base64;
 import android.view.DragEvent;
 import android.view.View;
@@ -26,34 +26,38 @@ import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyFactory;
-import java.security.MessageDigest;
 import java.security.PublicKey;
 import java.security.Signature;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 public class MainActivity extends Activity {
     private static final int PICK_CONF = 7019;
     private static final int MAX_CONF_BYTES = 2 * 1024 * 1024;
     private static final String FORMAT = "VELAGATE-CONF-1";
+    private static final String PROBE_URL = "https://www.baidu.com/";
     private static final String PUBLIC_KEY_B64 = "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAulZkt19w71eOcapPg++Y9TSToPrL3PyfbIg3DtwVhO71gle6ZCbJ0uMFHfZ7lRUXEGVaXNYyw7JhxSf/qV0FSnfXvipz5vv9jBLzQs86c6/NucPG+1OLH/DatZBY6ancwwYkZIk5gVLnY2hwa+8Cl62knikFWfcu6KDU653Yah1GlayuiwUYS5Kt4IS4qVntWgUcU5rduOuVmasoQjZgoHACq9l5W6bgJA2m6CH0GtFdYh6RKenQJpeVN40WlMvLFwCBTa5DaTv7MXpLAAyNxxj3cEjF6ctiCbr0Zwd+82FKaAal7sh48Hw+CI+ueluTy375nZKkCIYBx6LMsO+VMwIDAQAB";
 
     private WebView webView;
     private final ExecutorService ioExecutor = Executors.newSingleThreadExecutor();
-    private SharedPreferences prefs;
+    private final ScheduledExecutorService trafficExecutor = Executors.newSingleThreadScheduledExecutor();
+    private ScheduledFuture<?> trafficTask;
+    private long lastRxBytes = -1L;
+    private long lastTxBytes = -1L;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         getWindow().setStatusBarColor(Color.rgb(17, 25, 31));
         getWindow().setNavigationBarColor(Color.rgb(17, 25, 31));
-        prefs = getSharedPreferences("velagate_bindings", MODE_PRIVATE);
 
         webView = new WebView(this);
         setContentView(webView);
@@ -125,7 +129,7 @@ public class MainActivity extends Activity {
                 String content = readText(uri);
                 processConf(name, content);
             } catch (Exception e) {
-                sendError("读取文件失败：" + safeMessage(e));
+                sendError("Unable to read configuration: " + safeMessage(e));
             }
         });
     }
@@ -144,19 +148,19 @@ public class MainActivity extends Activity {
             if (cursor != null) cursor.close();
         }
         if (name == null || name.trim().isEmpty()) name = uri.getLastPathSegment();
-        return name == null ? "unknown.conf" : name;
+        return name == null ? "configuration.conf" : name;
     }
 
     private String readText(Uri uri) throws Exception {
         ContentResolver resolver = getContentResolver();
         try (InputStream in = resolver.openInputStream(uri); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-            if (in == null) throw new IllegalStateException("无法打开文件");
+            if (in == null) throw new IllegalStateException("File cannot be opened");
             byte[] buffer = new byte[8192];
             int total = 0;
             int n;
             while ((n = in.read(buffer)) != -1) {
                 total += n;
-                if (total > MAX_CONF_BYTES) throw new IllegalArgumentException("配置文件过大");
+                if (total > MAX_CONF_BYTES) throw new IllegalArgumentException("Configuration file is too large");
                 out.write(buffer, 0, n);
             }
             return out.toString(StandardCharsets.UTF_8.name());
@@ -166,8 +170,9 @@ public class MainActivity extends Activity {
     private void processConf(String fileName, String content) {
         try {
             if (fileName == null || !fileName.toLowerCase().endsWith(".conf")) {
-                throw new IllegalArgumentException("只支持 .conf 文件");
+                throw new IllegalArgumentException("Only .conf files are supported");
             }
+
             JSONObject raw = new JSONObject(content);
             String format = raw.optString("format");
             String kind = raw.optString("kind");
@@ -176,22 +181,24 @@ public class MainActivity extends Activity {
             String payloadB64 = raw.optString("payload");
             String signatureB64 = raw.optString("signature");
 
-            if (!FORMAT.equals(format)) throw new SecurityException("不是 VelaGate 配置文件");
-            if (!("route".equals(kind) || "traffic".equals(kind))) throw new SecurityException("配置类型无效");
+            if (!FORMAT.equals(format)) throw new SecurityException("Unsupported VelaGate configuration");
+            if (!("route".equals(kind) || "traffic".equals(kind))) throw new SecurityException("Invalid configuration type");
             if (fileId.isEmpty() || issuedAt.isEmpty() || payloadB64.isEmpty() || signatureB64.isEmpty()) {
-                throw new SecurityException("配置字段不完整");
+                throw new SecurityException("Incomplete configuration file");
             }
 
             String signed = format + "\n" + kind + "\n" + fileId + "\n" + issuedAt + "\n" + payloadB64;
-            if (!verifySignature(signed, signatureB64)) throw new SecurityException("签名校验失败，只能解析受信任配置");
+            if (!verifySignature(signed, signatureB64)) {
+                throw new SecurityException("Signature verification failed");
+            }
 
             byte[] payloadBytes = Base64.decode(payloadB64, Base64.DEFAULT);
             JSONObject payload = new JSONObject(new String(payloadBytes, StandardCharsets.UTF_8));
             if ("route".equals(kind) && !"EUROPE".equals(payload.optString("region"))) {
-                throw new SecurityException("仅允许欧洲专线配置");
+                throw new SecurityException("Only the Europe route configuration is supported");
             }
             if ("traffic".equals(kind) && payload.optString("routeFileId").isEmpty()) {
-                throw new SecurityException("流量包未绑定欧洲专线文件");
+                throw new SecurityException("Traffic configuration is not bound to a route file");
             }
 
             JSONObject normalized = new JSONObject();
@@ -199,6 +206,7 @@ public class MainActivity extends Activity {
             normalized.put("fileId", fileId);
             normalized.put("issuedAt", issuedAt);
             normalized.put("payload", payload);
+
             runOnUiThread(() -> webView.evaluateJavascript(
                     "window.onNativeConf(" + JSONObject.quote(normalized.toString()) + "," + JSONObject.quote(fileName) + ");", null));
         } catch (Exception e) {
@@ -215,94 +223,95 @@ public class MainActivity extends Activity {
         return verifier.verify(Base64.decode(signatureB64, Base64.DEFAULT));
     }
 
-    private String deviceId() {
-        String androidId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
-        if (androidId == null) androidId = "unknown";
+    private synchronized void startTrafficProbe() {
+        stopTrafficProbeLocked();
+        int uid = android.os.Process.myUid();
+        lastRxBytes = TrafficStats.getUidRxBytes(uid);
+        lastTxBytes = TrafficStats.getUidTxBytes(uid);
+        trafficTask = trafficExecutor.scheduleAtFixedRate(this::runTrafficProbe, 0, 5, TimeUnit.SECONDS);
+    }
+
+    private synchronized void stopTrafficProbe() {
+        stopTrafficProbeLocked();
+    }
+
+    private void stopTrafficProbeLocked() {
+        if (trafficTask != null) {
+            trafficTask.cancel(true);
+            trafficTask = null;
+        }
+        lastRxBytes = -1L;
+        lastTxBytes = -1L;
+    }
+
+    private void runTrafficProbe() {
+        long started = SystemClock.elapsedRealtime();
+        boolean ok = false;
+        int fallbackRx = 0;
+        HttpURLConnection conn = null;
         try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] out = digest.digest((androidId + "|com.velagate.app|v1").getBytes(StandardCharsets.UTF_8));
-            StringBuilder sb = new StringBuilder();
-            for (byte b : out) sb.append(String.format("%02x", b));
-            return sb.substring(0, 32);
-        } catch (Exception e) {
-            return androidId;
-        }
-    }
-
-    private JSONObject activateLocal(String routeId, String trafficId) throws Exception {
-        String device = deviceId();
-        String pairId = routeId + "::" + trafficId;
-        String routeDevice = prefs.getString("file:" + routeId, null);
-        String trafficDevice = prefs.getString("file:" + trafficId, null);
-        String routePair = prefs.getString("pair:" + routeId, null);
-        String trafficPair = prefs.getString("pair:" + trafficId, null);
-
-        if ((routeDevice != null && !routeDevice.equals(device)) || (trafficDevice != null && !trafficDevice.equals(device))) {
-            return result(false, "local", "FILE_ALREADY_BOUND", "配置文件已绑定其他设备");
-        }
-        if ((routePair != null && !routePair.equals(pairId)) || (trafficPair != null && !trafficPair.equals(pairId))) {
-            return result(false, "local", "PAIR_MISMATCH", "配置文件已用于其他配对");
-        }
-        prefs.edit()
-                .putString("file:" + routeId, device)
-                .putString("file:" + trafficId, device)
-                .putString("pair:" + routeId, pairId)
-                .putString("pair:" + trafficId, pairId)
-                .apply();
-        return result(true, "local", "OK", "本设备绑定成功");
-    }
-
-    private JSONObject activateRemote(String endpoint, String routeId, String trafficId) throws Exception {
-        HttpURLConnection conn = (HttpURLConnection) new URL(endpoint).openConnection();
-        conn.setConnectTimeout(7000);
-        conn.setReadTimeout(7000);
-        conn.setRequestMethod("POST");
-        conn.setDoOutput(true);
-        conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-        JSONObject body = new JSONObject();
-        body.put("routeFileId", routeId);
-        body.put("trafficFileId", trafficId);
-        body.put("deviceId", deviceId());
-        byte[] bytes = body.toString().getBytes(StandardCharsets.UTF_8);
-        conn.setFixedLengthStreamingMode(bytes.length);
-        try (OutputStream os = conn.getOutputStream()) {
-            os.write(bytes);
-        }
-        int code = conn.getResponseCode();
-        InputStream stream = code >= 200 && code < 300 ? conn.getInputStream() : conn.getErrorStream();
-        String text = "";
-        if (stream != null) {
-            try (InputStream in = stream; ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-                byte[] buf = new byte[4096]; int n;
-                while ((n = in.read(buf)) != -1) out.write(buf, 0, n);
-                text = out.toString(StandardCharsets.UTF_8.name());
+            conn = (HttpURLConnection) new URL(PROBE_URL).openConnection();
+            conn.setInstanceFollowRedirects(true);
+            conn.setConnectTimeout(4000);
+            conn.setReadTimeout(4000);
+            conn.setUseCaches(false);
+            conn.setRequestMethod("GET");
+            conn.setRequestProperty("User-Agent", "VelaGate/1.1 Android");
+            conn.setRequestProperty("Connection", "close");
+            int code = conn.getResponseCode();
+            InputStream stream = code >= 400 ? conn.getErrorStream() : conn.getInputStream();
+            if (stream != null) {
+                try (InputStream in = stream) {
+                    byte[] buffer = new byte[4096];
+                    int n;
+                    while ((n = in.read(buffer)) != -1 && fallbackRx < 65536) {
+                        fallbackRx += n;
+                    }
+                }
             }
+            ok = code >= 200 && code < 400;
+        } catch (Exception ignored) {
+            ok = false;
+        } finally {
+            if (conn != null) conn.disconnect();
         }
-        JSONObject result;
-        try { result = new JSONObject(text); }
-        catch (Exception ignored) { result = new JSONObject(); }
-        result.put("mode", "remote");
-        if (!result.has("ok")) result.put("ok", code >= 200 && code < 300);
-        if (!result.has("message")) result.put("message", result.optBoolean("ok") ? "设备绑定成功" : "设备绑定失败");
-        return result;
+
+        long elapsed = Math.max(1L, SystemClock.elapsedRealtime() - started);
+        int uid = android.os.Process.myUid();
+        long nowRx = TrafficStats.getUidRxBytes(uid);
+        long nowTx = TrafficStats.getUidTxBytes(uid);
+        long rxDelta;
+        long txDelta;
+
+        synchronized (this) {
+            if (trafficTask == null) return;
+            if (nowRx == TrafficStats.UNSUPPORTED || lastRxBytes == TrafficStats.UNSUPPORTED || lastRxBytes < 0) {
+                rxDelta = Math.max(0, fallbackRx);
+            } else {
+                rxDelta = Math.max(0L, nowRx - lastRxBytes);
+            }
+            if (nowTx == TrafficStats.UNSUPPORTED || lastTxBytes == TrafficStats.UNSUPPORTED || lastTxBytes < 0) {
+                txDelta = 0L;
+            } else {
+                txDelta = Math.max(0L, nowTx - lastTxBytes);
+            }
+            lastRxBytes = nowRx;
+            lastTxBytes = nowTx;
+        }
+
+        sendTrafficSample(rxDelta, txDelta, ok, elapsed);
     }
 
-    private JSONObject result(boolean ok, String mode, String code, String message) throws Exception {
-        JSONObject o = new JSONObject();
-        o.put("ok", ok);
-        o.put("mode", mode);
-        o.put("code", code);
-        o.put("message", message);
-        return o;
-    }
-
-    private void sendActivationResult(JSONObject result) {
-        runOnUiThread(() -> webView.evaluateJavascript(
-                "window.onActivationResult(" + JSONObject.quote(result.toString()) + ");", null));
+    private void sendTrafficSample(long rxBytes, long txBytes, boolean ok, long elapsedMs) {
+        runOnUiThread(() -> {
+            if (webView == null) return;
+            String js = "window.onTrafficSample(" + rxBytes + "," + txBytes + "," + ok + "," + elapsedMs + ");";
+            webView.evaluateJavascript(js, null);
+        });
     }
 
     private void sendError(String message) {
-        String m = (message == null || message.trim().isEmpty()) ? "配置文件解析失败" : message;
+        String m = (message == null || message.trim().isEmpty()) ? "Configuration parsing failed" : message;
         runOnUiThread(() -> {
             Toast.makeText(this, m, Toast.LENGTH_SHORT).show();
             webView.evaluateJavascript("window.onNativeError(" + JSONObject.quote(m) + ");", null);
@@ -316,14 +325,23 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        stopTrafficProbe();
         ioExecutor.shutdownNow();
-        if (webView != null) webView.destroy();
+        trafficExecutor.shutdownNow();
+        if (webView != null) {
+            webView.removeJavascriptInterface("Android");
+            webView.destroy();
+            webView = null;
+        }
         super.onDestroy();
     }
 
     public class Bridge {
         private final Context context;
-        Bridge(Context context) { this.context = context; }
+
+        Bridge(Context context) {
+            this.context = context;
+        }
 
         @JavascriptInterface
         public void pickConfigs() {
@@ -336,29 +354,13 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
-        public String getDeviceId() {
-            return deviceId();
+        public void startTrafficProbe() {
+            MainActivity.this.startTrafficProbe();
         }
 
         @JavascriptInterface
-        public String getActivationMode() {
-            return BuildConfig.ACTIVATION_URL == null || BuildConfig.ACTIVATION_URL.trim().isEmpty() ? "local" : "remote";
-        }
-
-        @JavascriptInterface
-        public void activatePair(String routeId, String trafficId) {
-            ioExecutor.execute(() -> {
-                try {
-                    JSONObject result;
-                    String url = BuildConfig.ACTIVATION_URL == null ? "" : BuildConfig.ACTIVATION_URL.trim();
-                    if (url.isEmpty()) result = activateLocal(routeId, trafficId);
-                    else result = activateRemote(url, routeId, trafficId);
-                    sendActivationResult(result);
-                } catch (Exception e) {
-                    try { sendActivationResult(result(false, "remote", "ACTIVATION_ERROR", safeMessage(e))); }
-                    catch (Exception ignored) { sendError("设备绑定失败"); }
-                }
-            });
+        public void stopTrafficProbe() {
+            MainActivity.this.stopTrafficProbe();
         }
     }
 }
