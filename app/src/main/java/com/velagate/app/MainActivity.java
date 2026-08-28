@@ -5,6 +5,7 @@ import android.content.ClipData;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.graphics.Color;
 import android.net.TrafficStats;
@@ -12,6 +13,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.provider.OpenableColumns;
+import android.provider.Settings;
 import android.util.Base64;
 import android.view.DragEvent;
 import android.view.View;
@@ -26,10 +28,12 @@ import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyFactory;
+import java.security.MessageDigest;
 import java.security.PublicKey;
 import java.security.Signature;
 import java.security.spec.X509EncodedKeySpec;
@@ -47,6 +51,7 @@ public class MainActivity extends Activity {
     private static final String PUBLIC_KEY_B64 = "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAulZkt19w71eOcapPg++Y9TSToPrL3PyfbIg3DtwVhO71gle6ZCbJ0uMFHfZ7lRUXEGVaXNYyw7JhxSf/qV0FSnfXvipz5vv9jBLzQs86c6/NucPG+1OLH/DatZBY6ancwwYkZIk5gVLnY2hwa+8Cl62knikFWfcu6KDU653Yah1GlayuiwUYS5Kt4IS4qVntWgUcU5rduOuVmasoQjZgoHACq9l5W6bgJA2m6CH0GtFdYh6RKenQJpeVN40WlMvLFwCBTa5DaTv7MXpLAAyNxxj3cEjF6ctiCbr0Zwd+82FKaAal7sh48Hw+CI+ueluTy375nZKkCIYBx6LMsO+VMwIDAQAB";
 
     private WebView webView;
+    private SharedPreferences prefs;
     private final ExecutorService ioExecutor = Executors.newSingleThreadExecutor();
     private final ScheduledExecutorService trafficExecutor = Executors.newSingleThreadScheduledExecutor();
     private ScheduledFuture<?> trafficTask;
@@ -58,6 +63,7 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         getWindow().setStatusBarColor(Color.rgb(17, 25, 31));
         getWindow().setNavigationBarColor(Color.rgb(17, 25, 31));
+        prefs = getSharedPreferences("velagate_imports", MODE_PRIVATE);
 
         webView = new WebView(this);
         setContentView(webView);
@@ -81,9 +87,7 @@ public class MainActivity extends Activity {
     }
 
     private boolean handleDrag(View view, DragEvent event) {
-        if (event.getAction() == DragEvent.ACTION_DRAG_STARTED) {
-            return event.getClipDescription() != null;
-        }
+        if (event.getAction() == DragEvent.ACTION_DRAG_STARTED) return event.getClipDescription() != null;
         if (event.getAction() == DragEvent.ACTION_DROP) {
             if (android.os.Build.VERSION.SDK_INT >= 24) {
                 try { requestDragAndDropPermissions(event); } catch (Exception ignored) {}
@@ -125,9 +129,7 @@ public class MainActivity extends Activity {
     private void processUriAsync(Uri uri) {
         ioExecutor.execute(() -> {
             try {
-                String name = getDisplayName(uri);
-                String content = readText(uri);
-                processConf(name, content);
+                processConf(getDisplayName(uri), readText(uri));
             } catch (Exception e) {
                 sendError("Unable to read configuration: " + safeMessage(e));
             }
@@ -187,10 +189,12 @@ public class MainActivity extends Activity {
                 throw new SecurityException("Incomplete configuration file");
             }
 
-            String signed = format + "\n" + kind + "\n" + fileId + "\n" + issuedAt + "\n" + payloadB64;
-            if (!verifySignature(signed, signatureB64)) {
-                throw new SecurityException("Signature verification failed");
+            if (prefs.getBoolean("imported:" + fileId, false)) {
+                throw new IllegalStateException("Configuration already imported");
             }
+
+            String signed = format + "\n" + kind + "\n" + fileId + "\n" + issuedAt + "\n" + payloadB64;
+            if (!verifySignature(signed, signatureB64)) throw new SecurityException("Signature verification failed");
 
             byte[] payloadBytes = Base64.decode(payloadB64, Base64.DEFAULT);
             JSONObject payload = new JSONObject(new String(payloadBytes, StandardCharsets.UTF_8));
@@ -201,14 +205,26 @@ public class MainActivity extends Activity {
                 throw new SecurityException("Traffic configuration is not bound to a route file");
             }
 
+            JSONObject claim = claimFile(fileId, kind);
+            if (!claim.optBoolean("ok")) {
+                throw new SecurityException(claim.optString("message", "Configuration has already been used"));
+            }
+
+            prefs.edit().putBoolean("imported:" + fileId, true).apply();
+
             JSONObject normalized = new JSONObject();
             normalized.put("kind", kind);
             normalized.put("fileId", fileId);
             normalized.put("issuedAt", issuedAt);
             normalized.put("payload", payload);
+            normalized.put("claimMode", claim.optString("mode", "local"));
+            normalized.put("claimCode", claim.optString("code", "CLAIMED"));
 
-            runOnUiThread(() -> webView.evaluateJavascript(
-                    "window.onNativeConf(" + JSONObject.quote(normalized.toString()) + "," + JSONObject.quote(fileName) + ");", null));
+            runOnUiThread(() -> {
+                if (webView == null) return;
+                webView.evaluateJavascript(
+                        "window.onNativeConf(" + JSONObject.quote(normalized.toString()) + "," + JSONObject.quote(fileName) + ");", null);
+            });
         } catch (Exception e) {
             sendError(safeMessage(e));
         }
@@ -223,6 +239,82 @@ public class MainActivity extends Activity {
         return verifier.verify(Base64.decode(signatureB64, Base64.DEFAULT));
     }
 
+    private JSONObject claimFile(String fileId, String kind) throws Exception {
+        String base = activationBaseUrl();
+        if (base.isEmpty()) return claimLocal(fileId, kind);
+
+        HttpURLConnection conn = (HttpURLConnection) new URL(base + "/claim").openConnection();
+        conn.setConnectTimeout(7000);
+        conn.setReadTimeout(7000);
+        conn.setRequestMethod("POST");
+        conn.setDoOutput(true);
+        conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+        conn.setRequestProperty("Cache-Control", "no-store");
+
+        JSONObject body = new JSONObject();
+        body.put("fileId", fileId);
+        body.put("kind", kind);
+        body.put("deviceId", deviceId());
+        byte[] raw = body.toString().getBytes(StandardCharsets.UTF_8);
+        conn.setFixedLengthStreamingMode(raw.length);
+        try (OutputStream os = conn.getOutputStream()) { os.write(raw); }
+
+        int status = conn.getResponseCode();
+        InputStream stream = status >= 200 && status < 300 ? conn.getInputStream() : conn.getErrorStream();
+        String text = readStream(stream);
+        conn.disconnect();
+
+        JSONObject result;
+        try { result = new JSONObject(text); }
+        catch (Exception ignored) { result = new JSONObject(); }
+        result.put("mode", "remote");
+        if (!result.has("ok")) result.put("ok", status >= 200 && status < 300);
+        if (!result.has("message")) result.put("message", result.optBoolean("ok") ? "Configuration claimed" : "Configuration claim failed");
+        return result;
+    }
+
+    private JSONObject claimLocal(String fileId, String kind) throws Exception {
+        JSONObject out = new JSONObject();
+        out.put("ok", true);
+        out.put("mode", "local");
+        out.put("code", "LOCAL_ONLY");
+        out.put("fileId", fileId);
+        out.put("kind", kind);
+        return out;
+    }
+
+    private String activationBaseUrl() {
+        String base = BuildConfig.ACTIVATION_URL == null ? "" : BuildConfig.ACTIVATION_URL.trim();
+        while (base.endsWith("/")) base = base.substring(0, base.length() - 1);
+        if (base.endsWith("/activate")) base = base.substring(0, base.length() - 9);
+        if (base.endsWith("/claim")) base = base.substring(0, base.length() - 6);
+        return base;
+    }
+
+    private String deviceId() {
+        String androidId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
+        if (androidId == null || androidId.trim().isEmpty()) androidId = "unknown";
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] bytes = digest.digest((androidId + "|com.velagate.app|v2").getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder();
+            for (byte b : bytes) sb.append(String.format("%02x", b));
+            return sb.substring(0, 32);
+        } catch (Exception e) {
+            return androidId;
+        }
+    }
+
+    private String readStream(InputStream stream) throws Exception {
+        if (stream == null) return "";
+        try (InputStream in = stream; ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[4096];
+            int n;
+            while ((n = in.read(buffer)) != -1) out.write(buffer, 0, n);
+            return out.toString(StandardCharsets.UTF_8.name());
+        }
+    }
+
     private synchronized void startTrafficProbe() {
         stopTrafficProbeLocked();
         int uid = android.os.Process.myUid();
@@ -231,9 +323,7 @@ public class MainActivity extends Activity {
         trafficTask = trafficExecutor.scheduleAtFixedRate(this::runTrafficProbe, 0, 5, TimeUnit.SECONDS);
     }
 
-    private synchronized void stopTrafficProbe() {
-        stopTrafficProbeLocked();
-    }
+    private synchronized void stopTrafficProbe() { stopTrafficProbeLocked(); }
 
     private void stopTrafficProbeLocked() {
         if (trafficTask != null) {
@@ -256,7 +346,7 @@ public class MainActivity extends Activity {
             conn.setReadTimeout(4000);
             conn.setUseCaches(false);
             conn.setRequestMethod("GET");
-            conn.setRequestProperty("User-Agent", "VelaGate/1.1 Android");
+            conn.setRequestProperty("User-Agent", "VelaGate/1.2 Android");
             conn.setRequestProperty("Connection", "close");
             int code = conn.getResponseCode();
             InputStream stream = code >= 400 ? conn.getErrorStream() : conn.getInputStream();
@@ -264,9 +354,7 @@ public class MainActivity extends Activity {
                 try (InputStream in = stream) {
                     byte[] buffer = new byte[4096];
                     int n;
-                    while ((n = in.read(buffer)) != -1 && fallbackRx < 65536) {
-                        fallbackRx += n;
-                    }
+                    while ((n = in.read(buffer)) != -1 && fallbackRx < 65536) fallbackRx += n;
                 }
             }
             ok = code >= 200 && code < 400;
@@ -285,28 +373,20 @@ public class MainActivity extends Activity {
 
         synchronized (this) {
             if (trafficTask == null) return;
-            if (nowRx == TrafficStats.UNSUPPORTED || lastRxBytes == TrafficStats.UNSUPPORTED || lastRxBytes < 0) {
-                rxDelta = Math.max(0, fallbackRx);
-            } else {
-                rxDelta = Math.max(0L, nowRx - lastRxBytes);
-            }
-            if (nowTx == TrafficStats.UNSUPPORTED || lastTxBytes == TrafficStats.UNSUPPORTED || lastTxBytes < 0) {
-                txDelta = 0L;
-            } else {
-                txDelta = Math.max(0L, nowTx - lastTxBytes);
-            }
+            rxDelta = nowRx == TrafficStats.UNSUPPORTED || lastRxBytes == TrafficStats.UNSUPPORTED || lastRxBytes < 0
+                    ? Math.max(0, fallbackRx) : Math.max(0L, nowRx - lastRxBytes);
+            txDelta = nowTx == TrafficStats.UNSUPPORTED || lastTxBytes == TrafficStats.UNSUPPORTED || lastTxBytes < 0
+                    ? 0L : Math.max(0L, nowTx - lastTxBytes);
             lastRxBytes = nowRx;
             lastTxBytes = nowTx;
         }
-
         sendTrafficSample(rxDelta, txDelta, ok, elapsed);
     }
 
     private void sendTrafficSample(long rxBytes, long txBytes, boolean ok, long elapsedMs) {
         runOnUiThread(() -> {
             if (webView == null) return;
-            String js = "window.onTrafficSample(" + rxBytes + "," + txBytes + "," + ok + "," + elapsedMs + ");";
-            webView.evaluateJavascript(js, null);
+            webView.evaluateJavascript("window.onTrafficSample(" + rxBytes + "," + txBytes + "," + ok + "," + elapsedMs + ");", null);
         });
     }
 
@@ -314,7 +394,7 @@ public class MainActivity extends Activity {
         String m = (message == null || message.trim().isEmpty()) ? "Configuration parsing failed" : message;
         runOnUiThread(() -> {
             Toast.makeText(this, m, Toast.LENGTH_SHORT).show();
-            webView.evaluateJavascript("window.onNativeError(" + JSONObject.quote(m) + ");", null);
+            if (webView != null) webView.evaluateJavascript("window.onNativeError(" + JSONObject.quote(m) + ");", null);
         });
     }
 
@@ -338,29 +418,21 @@ public class MainActivity extends Activity {
 
     public class Bridge {
         private final Context context;
-
-        Bridge(Context context) {
-            this.context = context;
-        }
+        Bridge(Context context) { this.context = context; }
 
         @JavascriptInterface
-        public void pickConfigs() {
-            runOnUiThread(MainActivity.this::openPicker);
-        }
+        public void pickConfigs() { runOnUiThread(MainActivity.this::openPicker); }
 
         @JavascriptInterface
-        public void toast(String message) {
-            runOnUiThread(() -> Toast.makeText(context, message, Toast.LENGTH_SHORT).show());
-        }
+        public void toast(String message) { runOnUiThread(() -> Toast.makeText(context, message, Toast.LENGTH_SHORT).show()); }
 
         @JavascriptInterface
-        public void startTrafficProbe() {
-            MainActivity.this.startTrafficProbe();
-        }
+        public void startTrafficProbe() { MainActivity.this.startTrafficProbe(); }
 
         @JavascriptInterface
-        public void stopTrafficProbe() {
-            MainActivity.this.stopTrafficProbe();
-        }
+        public void stopTrafficProbe() { MainActivity.this.stopTrafficProbe(); }
+
+        @JavascriptInterface
+        public String getActivationMode() { return activationBaseUrl().isEmpty() ? "local" : "remote"; }
     }
 }
