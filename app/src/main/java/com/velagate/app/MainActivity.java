@@ -48,7 +48,8 @@ public class MainActivity extends Activity {
     private static final int MAX_CONF_BYTES = 2 * 1024 * 1024;
     private static final String FORMAT = "VELAGATE-CONF-1";
     private static final String PROBE_URL = "https://www.baidu.com/";
-    private static final String PUBLIC_KEY_B64 = "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAulZkt19w71eOcapPg++Y9TSToPrL3PyfbIg3DtwVhO71gle6ZCbJ0uMFHfZ7lRUXEGVaXNYyw7JhxSf/qV0FSnfXvipz5vv9jBLzQs86c6/NucPG+1OLH/DatZBY6ancwwYkZIk5gVLnY2hwa+8Cl62knikFWfcu6KDU653Yah1GlayuiwUYS5Kt4IS4qVntWgUcU5rduOuVmasoQjZgoHACq9l5W6bgJA2m6CH0GtFdYh6RKenQJpeVN40WlMvLFwCBTa5DaTv7MXpLAAyNxxj3cEjF6ctiCbr0Zwd+82FKaAal7sh48Hw+CI+ueluTy375nZKkCIYBx6LMsO+VMwIDAQAB";
+    private static final String OLD_PUBLIC_KEY_B64 = "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAulZkt19w71eOcapPg++Y9TSToPrL3PyfbIg3DtwVhO71gle6ZCbJ0uMFHfZ7lRUXEGVaXNYyw7JhxSf/qV0FSnfXvipz5vv9jBLzQs86c6/NucPG+1OLH/DatZBY6ancwwYkZIk5gVLnY2hwa+8Cl62knikFWfcu6KDU653Yah1GlayuiwUYS5Kt4IS4qVntWgUcU5rduOuVmasoQjZgoHACq9l5W6bgJA2m6CH0GtFdYh6RKenQJpeVN40WlMvLFwCBTa5DaTv7MXpLAAyNxxj3cEjF6ctiCbr0Zwd+82FKaAal7sh48Hw+CI+ueluTy375nZKkCIYBx6LMsO+VMwIDAQAB";
+    private static final String MAKER_PUBLIC_KEY_B64 = "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsAmRHL8n0Jv9ShGgccC7CiNm/zSFaWciYErDNCPHlFHCbl3qbr9yJ7sDLqDvat5liF+vvOZ+WY7Swiz0RzKDoMEv+RBnr9M8ROQc0cSHJc3n9T1iajWFVCbF99HGSH0a5RRY3Tve97iTfxrPesX5dvE/01JI4cmYlBUd2xKp7WOdjaB/XUAkrI0DFIoZjW2ubDkCggk7jzdZUvlrMgRRdw2CI17g/79mpBG67PlZS5NXpfWQ8Puv5TMHkSZUztTf6NiAycdO187fl22yV3Z0EM2BWhBCKd/fcx7d+gjLAmJ0/X+emoSd85L6YJg0KkyOBayi3WAiBtOAMo3xdWD+PwIDAQAB";
 
     private WebView webView;
     private SharedPreferences prefs;
@@ -235,12 +236,21 @@ public class MainActivity extends Activity {
     }
 
     private boolean verifySignature(String signed, String signatureB64) throws Exception {
-        byte[] der = Base64.decode(PUBLIC_KEY_B64, Base64.DEFAULT);
-        PublicKey publicKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(der));
-        Signature verifier = Signature.getInstance("SHA256withRSA");
-        verifier.initVerify(publicKey);
-        verifier.update(signed.getBytes(StandardCharsets.UTF_8));
-        return verifier.verify(Base64.decode(signatureB64, Base64.DEFAULT));
+        byte[] signatureBytes = Base64.decode(signatureB64, Base64.DEFAULT);
+        byte[] signedBytes = signed.getBytes(StandardCharsets.UTF_8);
+        String[] keys = {OLD_PUBLIC_KEY_B64, MAKER_PUBLIC_KEY_B64};
+        for (String keyB64 : keys) {
+            try {
+                byte[] der = Base64.decode(keyB64, Base64.DEFAULT);
+                PublicKey publicKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(der));
+                Signature verifier = Signature.getInstance("SHA256withRSA");
+                verifier.initVerify(publicKey);
+                verifier.update(signedBytes);
+                if (verifier.verify(signatureBytes)) return true;
+            } catch (Exception ignored) {
+            }
+        }
+        return false;
     }
 
     private JSONObject claimFile(JSONObject config) throws Exception {
