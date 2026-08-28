@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>VelaGate</title>
+<style>
+:root{--top:#11191f;--green:#17b26a;--green2:#0d8c55;--red:#dd5a64;--line:#d7dadd;--text:#20262b;--muted:#7c858c;--paper:#f3f4f2;--white:#fff}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",Arial,sans-serif;background:var(--paper);color:var(--text);overflow:hidden}
+button{font:inherit}
+.app{height:100%;display:flex;flex-direction:column;background:#efefed}
+.topbar{height:58px;flex:0 0 58px;background:var(--top);color:white;display:flex;align-items:center;padding:0 12px;box-shadow:0 2px 7px #0004;z-index:5}
+.brandMark{width:27px;height:27px;margin-right:10px;display:grid;place-items:center}.brandMark svg{width:26px;height:26px}
+.title{font-size:20px;font-weight:520;letter-spacing:.3px;flex:1}
+.iconBtn{width:42px;height:42px;border:0;background:transparent;color:white;border-radius:50%;display:grid;place-items:center;cursor:pointer}.iconBtn:active{background:#ffffff18}.iconBtn svg{width:23px;height:23px}
+.content{position:relative;flex:1;overflow:auto;padding-bottom:12px}
+.empty{height:100%;min-height:410px;display:flex;align-items:center;justify-content:center;padding:28px}
+.dropzone{width:min(350px,91vw);padding:40px 22px;border:1.5px dashed #a9afb2;border-radius:16px;background:#ffffffa8;text-align:center;color:#70787e;transition:.18s}
+.dropzone.drag{border-color:var(--green);background:#ecfff5;transform:scale(1.012)}
+.dropIcon{width:74px;height:74px;margin:0 auto 16px;border-radius:23px;background:#18232b;color:#effff8;display:grid;place-items:center;box-shadow:0 12px 30px #17202722}.dropIcon svg{width:42px;height:42px}
+.dropzone h2{margin:0 0 7px;font-size:18px;color:#2a3035}.dropzone p{margin:0;line-height:1.7;font-size:14px}.dropzone b{color:var(--green2)}
+.pending{display:none;position:sticky;top:0;z-index:3;background:#fff9d9;color:#665a14;padding:9px 13px;font-size:13px;border-bottom:1px solid #e9dfaa}.pending.show{display:block}
+.list{display:none;background:#fff}.list.show{display:block}
+.row{height:75px;display:flex;align-items:stretch;background:#fbfbfa;border-bottom:1px solid #dadcdb;position:relative}
+.accent{width:5px;background:#9da2a5}.row.node .accent{background:var(--green)}
+.rowMain{flex:1;min-width:0;padding:11px 6px 7px 11px;display:flex;flex-direction:column;justify-content:center}.name{font-size:16px;line-height:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sub{font-size:13px;color:#858d91;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.proto{font-size:10px;color:var(--red);margin-top:2px;letter-spacing:.4px}
+.actions{display:flex;align-items:center;padding-right:4px}.rowBtn{width:42px;height:54px;border:0;background:transparent;color:#172026;display:grid;place-items:center;border-radius:8px}.rowBtn:active{background:#e7eae8}.rowBtn svg{width:22px;height:22px}
+.bottom{height:52px;flex:0 0 52px;background:var(--top);color:#c9d0d4;display:flex;align-items:center;padding:0 17px;font-size:13px;position:relative;z-index:4}.statusDot{width:8px;height:8px;border-radius:50%;background:#6f777d;margin-right:9px}.bottom.connected .statusDot{background:var(--green);box-shadow:0 0 0 4px #17b26a22}
+.fab{position:absolute;right:16px;bottom:27px;width:58px;height:58px;border-radius:50%;border:0;background:#6c7377;color:#fff;box-shadow:0 6px 14px #0005;display:grid;place-items:center;z-index:7;transition:.15s}.fab.enabled{background:var(--green)}.fab:active{transform:scale(.96)}.fab svg{width:31px;height:31px}
+.toast{position:fixed;left:50%;bottom:72px;transform:translate(-50%,12px);background:#263037ed;color:white;padding:10px 15px;border-radius:20px;font-size:13px;opacity:0;pointer-events:none;transition:.2s;z-index:50;white-space:nowrap;max-width:86vw;overflow:hidden;text-overflow:ellipsis}.toast.show{opacity:1;transform:translate(-50%,0)}
+.modal{position:fixed;inset:0;background:#0008;display:none;align-items:center;justify-content:center;padding:22px;z-index:40}.modal.show{display:flex}.card{width:min(380px,96vw);border-radius:18px;background:white;box-shadow:0 24px 70px #0007;overflow:hidden}.cardTitle{font-size:18px;font-weight:650;padding:20px 20px 12px}.cardBody{padding:0 20px 18px}.field{margin-top:12px}.field label{display:block;color:#727b80;font-size:12px;margin:0 0 6px}.field input{width:100%;height:43px;border:1px solid #cfd4d5;border-radius:10px;padding:0 12px;font-size:15px;outline:none}.field input:focus{border-color:var(--green)}.cardActions{display:flex;justify-content:flex-end;gap:4px;padding:7px 12px 12px}.textBtn{border:0;background:transparent;border-radius:9px;padding:10px 14px;font-size:14px}.textBtn.primary{color:var(--green2);font-weight:650}.textBtn:active{background:#f0f2f1}
+.qrWrap{text-align:center}.qrWrap img{width:230px;height:230px;border-radius:8px;image-rendering:pixelated}.qrText{font-size:14px;color:#31383d;margin:13px 0 3px;line-height:1.55}.qrNode{font-size:12px;color:#8a9296}
+.about{font-size:14px;color:#4c555a;line-height:1.7}.about strong{color:#1b2429}.modeTag{display:inline-flex;align-items:center;border-radius:14px;background:#edf2ef;padding:3px 8px;font-size:11px;color:#557067;margin-left:6px}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header class="topbar">
+    <div class="brandMark" aria-hidden="true"><svg viewBox="0 0 28 28"><path fill="#17b26a" d="M14 2.5 24 6.2l-1.4 12.1L14 25.6 5.4 18.3 4 6.2z"/><path fill="#0e1d24" d="M14 5.8 21 8.4l-1 8.4-6 5.2-6-5.2-1-8.4z"/><path fill="#ecfff6" d="M8.5 10.2h3.1l2.4 4.3 4-7h3.2l-7.3 13.1z"/></svg></div>
+    <div class="title">配置文件</div>
+    <button class="iconBtn" id="addBtn" aria-label="导入"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg></button>
+    <button class="iconBtn" id="filterBtn" aria-label="筛选"><svg viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" d="M4 5h16l-6.2 7v5.3L10 19v-7z"/></svg></button>
+    <button class="iconBtn" id="menuBtn" aria-label="菜单"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.7" fill="currentColor"/><circle cx="12" cy="12" r="1.7" fill="currentColor"/><circle cx="12" cy="19" r="1.7" fill="currentColor"/></svg></button>
+  </header>
+  <main class="content" id="content">
+    <div class="pending" id="pending"></div>
+    <div class="list" id="list"></div>
+    <div class="empty" id="empty">
+      <div class="dropzone" id="dropzone">
+        <div class="dropIcon"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M11 4h2v7h4l-5 5-5-5h4zM5 18h14v2H5z"/></svg></div>
+        <h2>拖入配置文件</h2>
+        <p>需要 <b>欧洲专线 .conf</b> + <b>流量包 .conf</b><br>也可以点击右上角 <b>+</b> 一次选择两份文件</p>
+      </div>
+    </div>
+  </main>
+  <footer class="bottom" id="bottom"><span class="statusDot"></span><span id="status">未连接</span><button class="fab" id="connectBtn" aria-label="连接"><svg viewBox="0 0 28 28"><path fill="currentColor" d="M5 8h5.2l3.6 7 6-11H25L13.8 24z"/></svg></button></footer>
+</div>
+<div class="toast" id="toast"></div>
+<div class="modal" id="editModal"><div class="card"><div class="cardTitle">编辑节点</div><div class="cardBody"><div class="field"><label>名称</label><input id="editName" /></div><div class="field"><label>IP 地址</label><input id="editIp" /></div><div class="field"><label>端口</label><input id="editPort" inputmode="numeric" /></div></div><div class="cardActions"><button class="textBtn" onclick="closeModal('editModal')">取消</button><button class="textBtn primary" id="saveEdit">保存</button></div></div></div>
+<div class="modal" id="qrModal"><div class="card"><div class="cardTitle">分享线路</div><div class="cardBody qrWrap"><div style="width:230px;height:230px;margin:auto;display:grid;place-items:center;border:12px solid #fff;background:repeating-conic-gradient(#111 0 25%,#fff 0 50%) 0/20px 20px;box-shadow:inset 0 0 0 2px #111"></div><div class="qrText">该线路已被解析，不能再次解析。</div><div class="qrNode" id="qrNode"></div></div><div class="cardActions"><button class="textBtn primary" onclick="closeModal('qrModal')">完成</button></div></div></div>
+<div class="modal" id="aboutModal"><div class="card"><div class="cardTitle">VelaGate</div><div class="cardBody about" id="aboutBody"></div><div class="cardActions"><button class="textBtn primary" onclick="closeModal('aboutModal')">关闭</button></div></div></div>
+<script>
+const $=id=>document.getElementById(id);let pendingRoute=null,pendingTraffic=null,editing=null,connected=false;let state=loadState();let activationWaiting=false;
+function loadState(){try{return JSON.parse(localStorage.getItem('velagate.state')||'null')}catch(e){return null}}function saveState(){if(state)localStorage.setItem('velagate.state',JSON.stringify(state));else localStorage.removeItem('velagate.state')}function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._x);t._x=setTimeout(()=>t.classList.remove('show'),1900);try{Android.toast(msg)}catch(e){}}function esc(s){return String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
+function icon(type){const m={share:'<path fill="currentColor" d="M18 16.1c-.8 0-1.5.3-2 .8l-7.1-4.1c.1-.3.1-.6.1-.8s0-.6-.1-.8L16 7.1a3 3 0 1 0-1-1.7L7.9 9.5A3 3 0 1 0 8 14.4l7 4.1a3 3 0 1 0 3-2.4z"/>',edit:'<path fill="currentColor" d="m4 16.8 9.9-9.9 3.2 3.2L7.2 20H4zM18.5 8.7l-3.2-3.2 1.6-1.6a1.4 1.4 0 0 1 2 0l1.2 1.2a1.4 1.4 0 0 1 0 2z"/>',del:'<path fill="currentColor" d="M7 7h10l-.7 13H7.7zM9 4h6l1 2H8z"/><path fill="#fff" d="M10 9h1.5v8H10zm3 0h1.5v8H13z"/>'};return `<svg viewBox="0 0 24 24">${m[type]}</svg>`}
+function rowHtml(item,index,type){const node=type==='node';return `<div class="row ${node?'node':'package'}"><div class="accent"></div><div class="rowMain"><div class="name">${esc(item.name)}</div><div class="sub">${esc(item.ip)} : ${esc(item.port)}</div><div class="proto">${esc(item.protocol||'VLESS')}</div></div><div class="actions"><button class="rowBtn" onclick="shareRow('${type}',${index})">${icon('share')}</button><button class="rowBtn" onclick="editRow('${type}',${index})">${icon('edit')}</button><button class="rowBtn" onclick="deleteRow('${type}',${index})">${icon('del')}</button></div></div>`}
+function render(){const rows=[];if(state?.package)rows.push(rowHtml(state.package,0,'package'));(state?.nodes||[]).forEach((n,i)=>rows.push(rowHtml(n,i,'node')));$('list').innerHTML=rows.join('');$('list').classList.toggle('show',rows.length>0);$('empty').style.display=rows.length?'none':'flex';$('connectBtn').classList.toggle('enabled',rows.length>0);if(!rows.length&&connected){connected=false;renderConnection()}renderPending()}
+function renderPending(){let text='';if(pendingRoute&&!pendingTraffic)text='已识别欧洲专线文件，请继续导入对应的流量包 .conf';if(!pendingRoute&&pendingTraffic)text='已识别流量包文件，请继续导入对应的欧洲专线 .conf';if(activationWaiting)text='配置已校验，正在绑定当前设备…';$('pending').textContent=text;$('pending').classList.toggle('show',!!text)}function renderConnection(){$('bottom').classList.toggle('connected',connected);$('status').textContent=connected?'已连接，点击测试连接':'未连接'}function closeModal(id){$(id).classList.remove('show')}
+function shareRow(type,index){const item=type==='package'?state?.package:state?.nodes?.[index];if(!item)return;$('qrNode').textContent=item.name+'  ·  '+item.ip+':'+item.port;$('qrModal').classList.add('show')}function editRow(type,index){const item=type==='package'?state?.package:state?.nodes?.[index];if(!item)return;editing={type,index};$('editName').value=item.name||'';$('editIp').value=item.ip||'';$('editPort').value=item.port||'';$('editModal').classList.add('show')}
+$('saveEdit').onclick=()=>{if(!editing||!state)return;const item=editing.type==='package'?state.package:state.nodes[editing.index];if(!item)return;const port=parseInt($('editPort').value.trim(),10);if(!$('editName').value.trim()||!$('editIp').value.trim()||!Number.isFinite(port)){toast('名称、IP、端口不能为空');return}item.name=$('editName').value.trim();item.ip=$('editIp').value.trim();item.port=port;saveState();render();closeModal('editModal');toast('已保存')};function deleteRow(type,index){if(!state)return;const item=type==='package'?state.package:state.nodes[index];if(!item)return;if(!confirm('确定删除「'+item.name+'」吗？'))return;if(type==='package')state.package=null;else state.nodes.splice(index,1);saveState();render();toast('已删除')}
+window.onNativeConf=function(normalizedText,fileName){try{const c=JSON.parse(normalizedText);if(state&&(c.fileId===state.routeFileId||c.fileId===state.trafficFileId)){toast('该文件已在本设备解析过');return}if(c.kind==='route'){pendingRoute=c;toast('欧洲专线文件校验通过')}else if(c.kind==='traffic'){pendingTraffic=c;toast('流量包文件校验通过')}renderPending();tryPair()}catch(e){toast('配置解析失败')}};window.onNativeError=function(msg){toast(msg||'配置文件无效')};function tryPair(){if(!pendingRoute||!pendingTraffic||activationWaiting)return;if(pendingTraffic.payload.routeFileId!==pendingRoute.fileId){toast('流量包与欧洲专线文件不匹配');pendingTraffic=null;renderPending();return}activationWaiting=true;renderPending();try{Android.activatePair(pendingRoute.fileId,pendingTraffic.fileId)}catch(e){activationWaiting=false;toast('设备绑定接口不可用');renderPending()}}
+window.onActivationResult=function(text){activationWaiting=false;let r={ok:false,message:'设备绑定失败'};try{r=JSON.parse(text)}catch(e){}if(!r.ok){toast(r.message||'该配置已在其他设备解析');renderPending();return}const p=pendingRoute.payload,t=pendingTraffic.payload;state={routeFileId:pendingRoute.fileId,trafficFileId:pendingTraffic.fileId,activationMode:r.mode||'local',package:{name:t.packageName,ip:t.ip,port:t.port,protocol:t.protocol||'VLESS'},nodes:(p.nodes||[]).map(x=>({...x})),activatedAt:new Date().toISOString()};saveState();pendingRoute=null;pendingTraffic=null;render();toast('配置解析成功')};
+$('addBtn').onclick=()=>{try{Android.pickConfigs()}catch(e){toast('请在 Android 客户端中选择文件')}};$('filterBtn').onclick=()=>toast('当前仅显示欧洲专线');$('menuBtn').onclick=()=>{let mode='本机模式';try{mode=Android.getActivationMode()==='remote'?'在线唯一绑定':'本机演示绑定'}catch(e){}let device='';try{device=Android.getDeviceId()}catch(e){}$('aboutBody').innerHTML=`<strong>VelaGate 1.0</strong><span class="modeTag">${esc(mode)}</span><br>配置解析与签名校验为真实逻辑；连接按钮只做界面效果，不建立 VPN 隧道。<br><br><span style="color:#8a9296;font-size:12px">Device ${esc(device||'-')}</span>`;$('aboutModal').classList.add('show')};$('connectBtn').onclick=()=>{const count=(state?.nodes||[]).length+(state?.package?1:0);if(!count){toast('请先解析配置文件');return}connected=!connected;renderConnection();toast(connected?'启动服务成功':'服务已停止')};['dragenter','dragover'].forEach(ev=>document.addEventListener(ev,e=>{e.preventDefault();$('dropzone').classList.add('drag')}));['dragleave','drop'].forEach(ev=>document.addEventListener(ev,e=>{e.preventDefault();$('dropzone').classList.remove('drag')}));$('dropzone').onclick=()=>$('addBtn').click();render();renderConnection();
+</script>
+</body>
+</html>
